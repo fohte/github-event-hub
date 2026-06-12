@@ -74,8 +74,7 @@ export const createApp = (deps: ServerDeps): Hono => {
         event,
         error: err,
       })
-      // Return 200 so GitHub does not redeliver — handlers (e.g. Slack postMessage)
-      // are not idempotent, and replays would surface as duplicate notifications.
+      // Return 200 to suppress GitHub's redelivery; handler failures are not retried.
       return c.json({ ok: false, outcome: 'error' }, 200)
     }
   })

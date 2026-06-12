@@ -11,7 +11,6 @@ const emit = (level: Level, message: string, fields: LogFields): void => {
     message,
     ...fields,
   }
-  // Single-line JSON for easy ingestion by Loki/Promtail.
   const line = JSON.stringify(record, (_key, value: unknown) =>
     value instanceof Error
       ? { name: value.name, message: value.message, stack: value.stack }

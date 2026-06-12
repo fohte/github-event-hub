@@ -66,6 +66,20 @@ describe('buildPullRequestNotification', () => {
     })
   })
 
+  it('escapes Slack mrkdwn metacharacters in title', () => {
+    const input = baseInput({
+      title: 'fix: support <T> generics [security]',
+      branch: 'renovate/foo-vulnerability',
+    })
+    expect(buildPullRequestNotification(input)?.text).toBe(
+      [
+        ':lock: *Security PR opened on `fohte/example`*',
+        '*fix: support &lt;T&gt; generics [security]*',
+        '<https://github.com/fohte/example/pull/1|View pull request>',
+      ].join('\n'),
+    )
+  })
+
   it('returns null for non-security PRs', () => {
     expect(buildPullRequestNotification(baseInput())).toBeNull()
   })

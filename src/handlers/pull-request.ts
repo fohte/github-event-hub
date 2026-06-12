@@ -1,5 +1,7 @@
 import type { PullRequestOpenedEvent } from '@octokit/webhooks-types'
 
+import { escapeSlackMrkdwn } from '@/handlers/slack-mrkdwn'
+
 export interface PullRequestInput {
   repo: string
   title: string
@@ -36,8 +38,8 @@ export const buildPullRequestNotification = (
   if (!isSecurityPullRequest(input)) return null
 
   const text = [
-    `:lock: *Security PR opened on \`${input.repo}\`*`,
-    `*${input.title}*`,
+    `:lock: *Security PR opened on \`${escapeSlackMrkdwn(input.repo)}\`*`,
+    `*${escapeSlackMrkdwn(input.title)}*`,
     `<${input.url}|View pull request>`,
   ].join('\n')
 

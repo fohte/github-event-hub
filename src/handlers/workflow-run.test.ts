@@ -7,6 +7,7 @@ const baseInput = (
   overrides: Partial<WorkflowRunInput> = {},
 ): WorkflowRunInput => ({
   repo: 'fohte/example',
+  headRepo: 'fohte/example',
   workflow: 'CI',
   branch: 'main',
   defaultBranch: 'main',
@@ -32,6 +33,19 @@ describe('buildWorkflowRunNotification', () => {
     })
   })
 
+  it('escapes Slack mrkdwn metacharacters in workflow name', () => {
+    expect(
+      buildWorkflowRunNotification(baseInput({ workflow: 'CI <generics>' }))
+        ?.text,
+    ).toBe(
+      [
+        ':rotating_light: *CI failure on `fohte/example`*',
+        'Workflow: *CI &lt;generics&gt;* (branch `main`, commit `abcdef1`)',
+        '<https://github.com/fohte/example/actions/runs/1|View run>',
+      ].join('\n'),
+    )
+  })
+
   it.each([
     {
       name: 'conclusion is success',
@@ -45,7 +59,10 @@ describe('buildWorkflowRunNotification', () => {
       name: 'head branch is not the default',
       overrides: { branch: 'feature/x' },
     },
-    { name: 'head branch is null', overrides: { branch: null } },
+    {
+      name: 'head repository differs from the receiving repository (fork)',
+      overrides: { headRepo: 'someone/example' },
+    },
   ])('returns null when $name', ({ overrides }) => {
     expect(buildWorkflowRunNotification(baseInput(overrides))).toBeNull()
   })
