@@ -5,11 +5,13 @@ export interface LogFields {
 }
 
 const emit = (level: Level, message: string, fields: LogFields): void => {
+  // Spread user-provided fields first so core fields (time/level/message)
+  // can never be silently overridden by a misnamed key.
   const record = {
+    ...fields,
     time: new Date().toISOString(),
     level,
     message,
-    ...fields,
   }
   const line = JSON.stringify(record, (_key, value: unknown) =>
     value instanceof Error
