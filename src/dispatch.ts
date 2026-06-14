@@ -43,7 +43,7 @@ export const dispatch = async (
   switch (parsed.name) {
     case 'workflow_run': {
       if (!hasAction(parsed.payload, 'completed')) return 'ignored'
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- hasAction guard narrows the action literal but does not refine the payload union
       const typed = parsed.payload as WorkflowRunCompletedEvent
       const note = buildWorkflowRunNotification(extractWorkflowRunInput(typed))
       if (note === null) return 'filtered'
@@ -59,7 +59,7 @@ export const dispatch = async (
     }
     case 'pull_request': {
       if (!hasAction(parsed.payload, 'opened')) return 'ignored'
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- hasAction guard narrows the action literal but does not refine the payload union
       const typed = parsed.payload as PullRequestOpenedEvent
       const note = buildPullRequestNotification(extractPullRequestInput(typed))
       if (note === null) return 'filtered'
