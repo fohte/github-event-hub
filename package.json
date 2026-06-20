@@ -35,6 +35,6 @@
     "@octokit/webhooks": "14.2.0",
     "@octokit/webhooks-types": "7.6.1",
     "@slack/web-api": "7.16.0",
-    "hono": "4.12.23"
+    "hono": "4.12.25"
   }
 }
