@@ -39,12 +39,6 @@ pnpm build  # emit dist/
 pnpm start  # node dist/index.js
 ```
 
-## Deployment
+## Deployment & architecture
 
-The container image is published to `ghcr.io/fohte/github-event-hub` and deployed via a self-hosted Helm chart in the `infra` repository (`kubernetes/home/manifests/github-event-hub/`). Argo CD Image Updater pins the running tag to the latest digest. The service is exposed at `github-event-hub.fohte.net` through Cloudflare Tunnel.
-
-See [docs/architecture.md](docs/architecture.md) for the full deployment and request-flow details.
-
-## Architecture
-
-See [docs/architecture.md](docs/architecture.md).
+The container image is published to `ghcr.io/fohte/github-event-hub` and deployed via a self-hosted Helm chart in the `infra` repository. See [docs/architecture.md](docs/architecture.md) for the request flow, component breakdown, and infrastructure (image registry, ingress, secrets, webhook auto-registration).
