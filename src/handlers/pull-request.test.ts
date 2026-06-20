@@ -13,6 +13,7 @@ const baseInput = (
   title: 'chore(deps): update dependency foo',
   branch: 'renovate/foo-1.x',
   url: 'https://github.com/fohte/example/pull/1',
+  state: 'opened',
   ...overrides,
 })
 
@@ -49,22 +50,36 @@ describe('isSecurityPullRequest', () => {
 })
 
 describe('buildPullRequestNotification', () => {
-  it('returns a notification for security PRs', () => {
-    const input = baseInput({
-      title: 'fix(deps): update tauri [security]',
-      branch: 'renovate/crate-tauri-vulnerability',
-    })
-    expect(buildPullRequestNotification(input)).toEqual({
-      text: [
-        ':lock: *Security PR opened on `fohte/example`*',
-        '*fix(deps): update tauri [security]*',
-        '<https://github.com/fohte/example/pull/1|View pull request>',
-      ].join('\n'),
-      repo: 'fohte/example',
-      title: 'fix(deps): update tauri [security]',
-      url: 'https://github.com/fohte/example/pull/1',
-    })
-  })
+  it.each([
+    { state: 'opened' as const, label: 'opened', color: '#36a64f' },
+    { state: 'merged' as const, label: 'merged', color: '#6f42c1' },
+    { state: 'closed' as const, label: 'closed', color: '#d73a49' },
+  ])(
+    'returns a $color-bordered notification for $state security PRs',
+    ({ state, label, color }) => {
+      const input = baseInput({
+        title: 'fix(deps): update tauri [security]',
+        branch: 'renovate/crate-tauri-vulnerability',
+        state,
+      })
+      expect(buildPullRequestNotification(input)).toEqual({
+        text: [
+          `:lock: *Security PR ${label} on \`fohte/example\`*`,
+          '*fix(deps): update tauri [security]*',
+          '<https://github.com/fohte/example/pull/1|View pull request>',
+        ].join('\n'),
+        color,
+        metadata: {
+          event_type: 'security_pr',
+          event_payload: { pr_url: 'https://github.com/fohte/example/pull/1' },
+        },
+        repo: 'fohte/example',
+        title: 'fix(deps): update tauri [security]',
+        url: 'https://github.com/fohte/example/pull/1',
+        state,
+      })
+    },
+  )
 
   it('escapes Slack mrkdwn metacharacters in title', () => {
     const input = baseInput({

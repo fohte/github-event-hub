@@ -1,4 +1,5 @@
 import type {
+  PullRequestClosedEvent,
   PullRequestOpenedEvent,
   WorkflowRunCompletedEvent,
 } from '@octokit/webhooks-types'
@@ -12,7 +13,7 @@ import {
   extractWorkflowRunInput,
 } from '@/handlers/workflow-run'
 import { logger } from '@/logger'
-import type { SlackNotifier } from '@/slack'
+import type { SlackMessageContent, SlackNotifier } from '@/slack'
 
 export type DispatchOutcome = 'notified' | 'filtered' | 'ignored'
 
@@ -27,14 +28,15 @@ interface ParsedEvent {
   payload: unknown
 }
 
-const hasAction = (
+const hasAnyAction = (
   payload: unknown,
-  action: string,
+  actions: readonly string[],
 ): payload is { action: string } =>
   typeof payload === 'object' &&
   payload !== null &&
   'action' in payload &&
-  payload.action === action
+  typeof payload.action === 'string' &&
+  actions.includes(payload.action)
 
 export const dispatch = async (
   ctx: DispatchContext,
@@ -42,12 +44,12 @@ export const dispatch = async (
 ): Promise<DispatchOutcome> => {
   switch (parsed.name) {
     case 'workflow_run': {
-      if (!hasAction(parsed.payload, 'completed')) return 'ignored'
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- hasAction guard narrows the action literal but does not refine the payload union
+      if (!hasAnyAction(parsed.payload, ['completed'])) return 'ignored'
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- payload union refinement
       const typed = parsed.payload as WorkflowRunCompletedEvent
       const note = buildWorkflowRunNotification(extractWorkflowRunInput(typed))
       if (note === null) return 'filtered'
-      await ctx.notifier.postMessage(note.text)
+      await ctx.notifier.postMessage({ text: note.text })
       logger.info('slack_notified', {
         delivery_id: ctx.deliveryId,
         event: 'workflow_run',
@@ -58,15 +60,44 @@ export const dispatch = async (
       return 'notified'
     }
     case 'pull_request': {
-      if (!hasAction(parsed.payload, 'opened')) return 'ignored'
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- hasAction guard narrows the action literal but does not refine the payload union
-      const typed = parsed.payload as PullRequestOpenedEvent
+      if (!hasAnyAction(parsed.payload, ['opened', 'closed'])) return 'ignored'
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- payload union refinement
+      const typed = parsed.payload as
+        | PullRequestOpenedEvent
+        | PullRequestClosedEvent
       const note = buildPullRequestNotification(extractPullRequestInput(typed))
       if (note === null) return 'filtered'
-      await ctx.notifier.postMessage(note.text)
+
+      const content: SlackMessageContent = {
+        text: note.text,
+        color: note.color,
+        metadata: note.metadata,
+      }
+
+      if (note.state === 'opened') {
+        await ctx.notifier.postMessage(content)
+      } else {
+        const existing = await ctx.notifier.findMessageByMetadata(
+          'security_pr',
+          (p) => p['pr_url'] === note.url,
+        )
+        if (existing !== null) {
+          await ctx.notifier.updateMessage(existing, content)
+        } else {
+          logger.info('slack_original_not_found', {
+            delivery_id: ctx.deliveryId,
+            event: 'pull_request',
+            state: note.state,
+            url: note.url,
+          })
+          await ctx.notifier.postMessage(content)
+        }
+      }
+
       logger.info('slack_notified', {
         delivery_id: ctx.deliveryId,
         event: 'pull_request',
+        state: note.state,
         repo: note.repo,
         url: note.url,
       })
