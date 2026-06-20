@@ -25,7 +25,7 @@ flowchart LR
 3. The raw body is parsed as JSON. Parse failure returns `400`.
 4. `dispatch()` switches on the event name and runs the matching handler.
 5. If the handler returns a notification, the Slack client posts it; otherwise the request is recorded as `filtered` or `ignored`.
-6. Successful processing returns `200` with `{ ok: true, outcome }`. Any thrown error inside dispatch/handler is logged and also returned as `200` with `outcome: "error"` — this is intentional, because GitHub will redeliver any non-2xx response and the failures here are not transient.
+6. Successful processing returns `200` with `{ ok: true, outcome }`. Any thrown error inside dispatch/handler is logged and also returned as `200` with `{ ok: false, outcome: "error" }` — this is intentional, because GitHub will redeliver any non-2xx response and the failures here are not transient.
 
 ## Components
 
@@ -49,16 +49,16 @@ All source lives under `src/`.
 
 A Slack message is posted only when **all** of the following are true:
 
-- `action == "completed"`
-- `workflow_run.conclusion == "failure"`
-- `workflow_run.head_branch == repository.default_branch`
-- `workflow_run.head_repository.full_name == repository.full_name` — excludes runs originating from forks, whose `head_branch` can collide with the upstream default branch name.
+- `action === "completed"`
+- `workflow_run.conclusion === "failure"`
+- `workflow_run.head_branch === repository.default_branch`
+- `workflow_run.head_repository.full_name === repository.full_name` — excludes runs originating from forks, whose `head_branch` can collide with the upstream default branch name.
 
 The message names the repo, workflow, branch, and short SHA, and links to the run page.
 
 ### `pull_request`
 
-A Slack message is posted only when `action == "opened"` and at least one of:
+A Slack message is posted only when `action === "opened"` and at least one of:
 
 - the PR title ends with `[security]` (matched by `/\[security\]\s*$/`), or
 - the head branch matches `/^renovate\/.*-vulnerability$/`.
