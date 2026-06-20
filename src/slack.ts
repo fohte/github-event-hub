@@ -56,8 +56,6 @@ export const createSlackNotifier = (
   channel: string,
 ): SlackNotifier => {
   const client = new WebClient(token)
-  // Cache the resolution Promise (not the result) so concurrent webhooks share
-  // a single conversations.list pagination instead of racing against rate limits.
   let channelIdPromise: Promise<string> | null = null
 
   const resolveChannelId = (): Promise<string> => {
@@ -108,8 +106,6 @@ export const createSlackNotifier = (
     },
     async findMessageByMetadata(eventType, payloadMatcher) {
       const channelId = await resolveChannelId()
-      // Intentional single-page cap: a security PR's `opened` notification
-      // is expected within recent history; older PRs fall back to a new post.
       const res = await client.conversations.history({
         channel: channelId,
         limit: 200,

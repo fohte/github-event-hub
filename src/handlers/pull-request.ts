@@ -31,10 +31,10 @@ export interface PullRequestNotification {
 const SECURITY_TITLE_SUFFIX = /\[security\]\s*$/
 const RENOVATE_VULN_BRANCH = /^renovate\/.*-vulnerability$/
 
-const STATE_META: Record<PullRequestState, { color: string; label: string }> = {
-  opened: { color: '#36a64f', label: 'opened' },
-  merged: { color: '#6f42c1', label: 'merged' },
-  closed: { color: '#d73a49', label: 'closed' },
+const STATE_COLOR: Record<PullRequestState, string> = {
+  opened: '#36a64f',
+  merged: '#6f42c1',
+  closed: '#d73a49',
 }
 
 export const extractPullRequestInput = (
@@ -61,16 +61,15 @@ export const buildPullRequestNotification = (
 ): PullRequestNotification | null => {
   if (!isSecurityPullRequest(input)) return null
 
-  const meta = STATE_META[input.state]
   const text = [
-    `:lock: *Security PR ${meta.label} on \`${escapeSlackMrkdwn(input.repo)}\`*`,
+    `:lock: *Security PR ${input.state} on \`${escapeSlackMrkdwn(input.repo)}\`*`,
     `*${escapeSlackMrkdwn(input.title)}*`,
     `<${input.url}|View pull request>`,
   ].join('\n')
 
   return {
     text,
-    color: meta.color,
+    color: STATE_COLOR[input.state],
     metadata: {
       event_type: 'security_pr',
       event_payload: { pr_url: input.url },

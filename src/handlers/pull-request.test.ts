@@ -51,23 +51,43 @@ describe('isSecurityPullRequest', () => {
 
 describe('buildPullRequestNotification', () => {
   it.each([
-    { state: 'opened' as const, label: 'opened', color: '#36a64f' },
-    { state: 'merged' as const, label: 'merged', color: '#6f42c1' },
-    { state: 'closed' as const, label: 'closed', color: '#d73a49' },
+    {
+      state: 'opened' as const,
+      color: '#36a64f',
+      text: [
+        ':lock: *Security PR opened on `fohte/example`*',
+        '*fix(deps): update tauri [security]*',
+        '<https://github.com/fohte/example/pull/1|View pull request>',
+      ].join('\n'),
+    },
+    {
+      state: 'merged' as const,
+      color: '#6f42c1',
+      text: [
+        ':lock: *Security PR merged on `fohte/example`*',
+        '*fix(deps): update tauri [security]*',
+        '<https://github.com/fohte/example/pull/1|View pull request>',
+      ].join('\n'),
+    },
+    {
+      state: 'closed' as const,
+      color: '#d73a49',
+      text: [
+        ':lock: *Security PR closed on `fohte/example`*',
+        '*fix(deps): update tauri [security]*',
+        '<https://github.com/fohte/example/pull/1|View pull request>',
+      ].join('\n'),
+    },
   ])(
     'returns a $color-bordered notification for $state security PRs',
-    ({ state, label, color }) => {
+    ({ state, color, text }) => {
       const input = baseInput({
         title: 'fix(deps): update tauri [security]',
         branch: 'renovate/crate-tauri-vulnerability',
         state,
       })
       expect(buildPullRequestNotification(input)).toEqual({
-        text: [
-          `:lock: *Security PR ${label} on \`fohte/example\`*`,
-          '*fix(deps): update tauri [security]*',
-          '<https://github.com/fohte/example/pull/1|View pull request>',
-        ].join('\n'),
+        text,
         color,
         metadata: {
           event_type: 'security_pr',
