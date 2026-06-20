@@ -1,8 +1,9 @@
 # github-event-hub
 
-@fohte's personal hub that receives GitHub webhooks from repositories in the `fohte` org and forwards a curated subset to Slack (`#infra_alert`).
+@fohte's personal hub that receives GitHub webhooks from repositories in the `fohte` org and forwards a curated subset to a configurable Slack channel.
 
 [![Test](https://github.com/fohte/github-event-hub/actions/workflows/test.yml/badge.svg)](https://github.com/fohte/github-event-hub/actions/workflows/test.yml)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-fohte%2Fgithub--event--hub-blue?logo=github)](https://github.com/fohte/github-event-hub/pkgs/container/github-event-hub)
 
 ## Features
 
@@ -41,4 +42,4 @@ pnpm start  # node dist/index.js
 
 ## Deployment & architecture
 
-The container image is published to `ghcr.io/fohte/github-event-hub` and deployed via a self-hosted Helm chart in the `infra` repository. See [docs/architecture.md](docs/architecture.md) for the request flow, component breakdown, and infrastructure (image registry, ingress, secrets, webhook auto-registration).
+Deployed via a self-hosted Helm chart in the `infra` repository. See [docs/architecture.md](docs/architecture.md) for the request flow, notification rules, and infrastructure (image registry, ingress, secrets, webhook auto-registration).

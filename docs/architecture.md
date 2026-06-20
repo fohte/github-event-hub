@@ -5,17 +5,20 @@
 github-event-hub is a single Hono HTTP service that receives GitHub webhooks from every repository in the `fohte` org, applies a small set of filters, and posts matching events to Slack. It runs as a two-replica Deployment on the `home-k8s` cluster and is reached from GitHub over a Cloudflare Tunnel.
 
 ```mermaid
-flowchart LR
-  GH[GitHub<br/>webhook delivery]
-  CF[Cloudflare Tunnel<br/>github-event-hub.fohte.net]
-  SVC[K8s Service<br/>github-event-hub]
-  POD[Pod<br/>Hono server]
-  SLACK[Slack<br/>#infra_alert]
+sequenceDiagram
+  participant GH as GitHub
+  participant CF as Cloudflare Tunnel
+  participant POD as Hono server (Pod)
+  participant SLACK as Slack
 
-  GH -->|HTTPS POST /github| CF
-  CF --> SVC
-  SVC --> POD
-  POD -->|chat.postMessage| SLACK
+  GH->>CF: POST /github (webhook payload + x-hub-signature-256)
+  CF->>POD: forward via K8s Service
+  POD->>POD: verify signature, dispatch, filter
+  alt event matches a notification rule
+    POD->>SLACK: chat.postMessage
+    SLACK-->>POD: ok
+  end
+  POD-->>GH: 200
 ```
 
 ## Request flow
@@ -26,22 +29,6 @@ flowchart LR
 4. `dispatch()` switches on the event name and runs the matching handler.
 5. If the handler returns a notification, the Slack client posts it; otherwise the request is recorded as `filtered` or `ignored`.
 6. Successful processing returns `200` with `{ ok: true, outcome }`. Any thrown error inside dispatch/handler is logged and also returned as `200` with `{ ok: false, outcome: "error" }` — this is intentional, because GitHub will redeliver any non-2xx response and the failures here are not transient.
-
-## Components
-
-All source lives under `src/`.
-
-| Path                       | Responsibility                                                                                                                          |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `index.ts`                 | Entry point. Loads config, wires the Slack notifier, and starts the Hono server via `@hono/node-server`.                                |
-| `config.ts`                | Reads and validates environment variables. Throws on missing required values or invalid `PORT`.                                         |
-| `server.ts`                | Hono app. Routes `/healthz` and `/github`, performs signature verification, and delegates to `dispatch`.                                |
-| `dispatch.ts`              | Per-event-name switch. Narrows the payload to the expected `action`, builds a notification, and posts it.                               |
-| `handlers/workflow-run.ts` | `workflow_run` filter and Slack message builder.                                                                                        |
-| `handlers/pull-request.ts` | `pull_request` filter and Slack message builder.                                                                                        |
-| `handlers/slack-mrkdwn.ts` | Escapes `&`, `<`, `>` so user-controlled strings cannot break Slack mrkdwn link syntax.                                                 |
-| `slack.ts`                 | Thin wrapper around `@slack/web-api`'s `chat.postMessage`.                                                                              |
-| `logger.ts`                | Single-line JSON logger. `error` writes to stderr, everything else to stdout. `Error` instances are serialized with name/message/stack. |
 
 ## Notification rules
 
