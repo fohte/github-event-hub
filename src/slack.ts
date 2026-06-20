@@ -31,15 +31,13 @@ export interface SlackNotifier {
 type MessagePayload = { metadata?: SlackMessageMetadata } & (
   | { text: string; attachments?: never }
   | {
-      attachments: [{ color: string; text: string; mrkdwn_in: ['text'] }]
+      attachments: Array<{ color: string; text: string; mrkdwn_in: ['text'] }>
       text?: never
     }
 )
 
 const buildPayload = (content: SlackMessageContent): MessagePayload => {
-  // When color is set, the body goes inside the attachment so Slack renders
-  // the coloured border. Putting the same text at the top level too would
-  // make Slack display it twice.
+  // Slack renders the coloured border only when the body lives inside the attachment.
   const base: MessagePayload =
     content.color !== undefined
       ? {
