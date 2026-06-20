@@ -28,27 +28,29 @@ export interface SlackNotifier {
   ): Promise<SlackMessageRef | null>
 }
 
-interface MessagePayload {
-  text: string
-  attachments?: Array<{
-    color: string
-    text: string
-    mrkdwn_in: ['text']
-  }>
-  metadata?: SlackMessageMetadata
-}
+type MessagePayload = { metadata?: SlackMessageMetadata } & (
+  | { text: string; attachments?: never }
+  | {
+      attachments: [{ color: string; text: string; mrkdwn_in: ['text'] }]
+      text?: never
+    }
+)
 
 const buildPayload = (content: SlackMessageContent): MessagePayload => {
-  const payload: MessagePayload = { text: content.text }
-  if (content.color !== undefined) {
-    payload.attachments = [
-      { color: content.color, text: content.text, mrkdwn_in: ['text'] },
-    ]
-  }
-  if (content.metadata !== undefined) {
-    payload.metadata = content.metadata
-  }
-  return payload
+  // When color is set, the body goes inside the attachment so Slack renders
+  // the coloured border. Putting the same text at the top level too would
+  // make Slack display it twice.
+  const base: MessagePayload =
+    content.color !== undefined
+      ? {
+          attachments: [
+            { color: content.color, text: content.text, mrkdwn_in: ['text'] },
+          ],
+        }
+      : { text: content.text }
+  return content.metadata !== undefined
+    ? { ...base, metadata: content.metadata }
+    : base
 }
 
 export const createSlackNotifier = (
@@ -112,9 +114,8 @@ export const createSlackNotifier = (
         include_all_metadata: true,
       })
       const match = res.messages?.find((m) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Slack SDK types omit metadata on message history items
-        const md = (m as { metadata?: SlackMessageMetadata }).metadata
-        if (md === undefined) return false
+        const md = (m as { metadata?: Partial<SlackMessageMetadata> }).metadata
+        if (md?.event_payload == null) return false
         if (md.event_type !== eventType) return false
         return payloadMatcher(md.event_payload)
       })
