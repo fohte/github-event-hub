@@ -40,6 +40,6 @@ pnpm build  # emit dist/
 pnpm start  # node dist/index.js
 ```
 
-## Deployment & architecture
+## Architecture
 
-Deployed via a self-hosted Helm chart in the `infra` repository. See [docs/architecture.md](docs/architecture.md) for the request flow, notification rules, and infrastructure (image registry, ingress, secrets, webhook auto-registration).
+See [docs/architecture.md](docs/architecture.md) for the request flow and notification rules.
