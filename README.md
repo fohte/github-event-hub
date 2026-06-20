@@ -1,6 +1,6 @@
 # github-event-hub
 
-@fohte's personal hub that receives GitHub webhooks from repositories in the `fohte` org and forwards a curated subset to a configurable Slack channel.
+@fohte's personal hub that receives GitHub webhooks and forwards a curated subset to a configurable Slack channel.
 
 [![Test](https://github.com/fohte/github-event-hub/actions/workflows/test.yml/badge.svg)](https://github.com/fohte/github-event-hub/actions/workflows/test.yml)
 [![ghcr.io](https://img.shields.io/badge/ghcr.io-fohte%2Fgithub--event--hub-blue?logo=github)](https://github.com/fohte/github-event-hub/pkgs/container/github-event-hub)
