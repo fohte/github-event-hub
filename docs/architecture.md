@@ -43,11 +43,19 @@ The message names the repo, workflow, branch, and short SHA, and links to the ru
 
 ### `pull_request`
 
-A Slack message is posted only when `action === "opened"` and at least one of:
+Handled for `action === "opened"` and `action === "closed"`, when at least one of:
 
 - the PR title ends with `[security]` (matched by `/\[security\]\s*$/`), or
 - the head branch matches `/^renovate\/.*-vulnerability$/`.
 
-The message tags the PR as a security PR, includes the title, and links to the PR page.
+The message tags the PR as a security PR, includes the title, and links to the PR page. A coloured attachment border encodes the lifecycle state:
+
+| State                    | Border colour | Slack action                                   |
+| ------------------------ | ------------- | ---------------------------------------------- |
+| opened                   | green         | `chat.postMessage`                             |
+| merged (closed + merged) | purple        | `chat.update` on the original `opened` message |
+| closed without merging   | red           | `chat.update` on the original `opened` message |
+
+The link back to the original message uses Slack message metadata (`event_type: "security_pr"`, `event_payload: { pr_url }`). On a `closed` event the handler scans recent `conversations.history` of `SLACK_CHANNEL` for a matching metadata payload and edits that message in place. If no matching message is found (e.g. the original is past the history window, or the bot was offline when the PR was opened), the close notification is posted as a new message instead.
 
 All other events and actions short-circuit to `ignored`.

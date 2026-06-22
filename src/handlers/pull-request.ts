@@ -1,31 +1,55 @@
-import type { PullRequestOpenedEvent } from '@octokit/webhooks-types'
+import type {
+  PullRequestClosedEvent,
+  PullRequestOpenedEvent,
+} from '@octokit/webhooks-types'
 
 import { escapeSlackMrkdwn } from '@/handlers/slack-mrkdwn'
+
+export type PullRequestState = 'opened' | 'closed' | 'merged'
 
 export interface PullRequestInput {
   repo: string
   title: string
   branch: string
   url: string
+  state: PullRequestState
 }
 
 export interface PullRequestNotification {
   text: string
+  color: string
+  metadata: {
+    event_type: 'security_pr'
+    event_payload: { pr_url: string }
+  }
   repo: string
   title: string
   url: string
+  state: PullRequestState
 }
 
 const SECURITY_TITLE_SUFFIX = /\[security\]\s*$/
 const RENOVATE_VULN_BRANCH = /^renovate\/.*-vulnerability$/
 
+const STATE_COLOR: Record<PullRequestState, string> = {
+  opened: '#36a64f',
+  merged: '#6f42c1',
+  closed: '#d73a49',
+}
+
 export const extractPullRequestInput = (
-  payload: PullRequestOpenedEvent,
+  payload: PullRequestOpenedEvent | PullRequestClosedEvent,
 ): PullRequestInput => ({
   repo: payload.repository.full_name,
   title: payload.pull_request.title,
   branch: payload.pull_request.head.ref,
   url: payload.pull_request.html_url,
+  state:
+    payload.action === 'opened'
+      ? 'opened'
+      : payload.pull_request.merged
+        ? 'merged'
+        : 'closed',
 })
 
 export const isSecurityPullRequest = (input: PullRequestInput): boolean =>
@@ -38,10 +62,21 @@ export const buildPullRequestNotification = (
   if (!isSecurityPullRequest(input)) return null
 
   const text = [
-    `:lock: *Security PR opened on \`${escapeSlackMrkdwn(input.repo)}\`*`,
+    `:lock: *Security PR ${input.state} on \`${escapeSlackMrkdwn(input.repo)}\`*`,
     `*${escapeSlackMrkdwn(input.title)}*`,
     `<${input.url}|View pull request>`,
   ].join('\n')
 
-  return { text, repo: input.repo, title: input.title, url: input.url }
+  return {
+    text,
+    color: STATE_COLOR[input.state],
+    metadata: {
+      event_type: 'security_pr',
+      event_payload: { pr_url: input.url },
+    },
+    repo: input.repo,
+    title: input.title,
+    url: input.url,
+    state: input.state,
+  }
 }
