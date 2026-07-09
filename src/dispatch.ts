@@ -63,8 +63,7 @@ export const dispatch = async (
       if (!hasAnyAction(parsed.payload, ['opened', 'closed'])) return 'ignored'
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- payload union refinement
       const typed = parsed.payload as
-        | PullRequestOpenedEvent
-        | PullRequestClosedEvent
+        PullRequestOpenedEvent | PullRequestClosedEvent
       const note = buildPullRequestNotification(extractPullRequestInput(typed))
       if (note === null) return 'filtered'
 
