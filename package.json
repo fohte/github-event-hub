@@ -24,6 +24,7 @@
     "@types/node": "24.13.2",
     "concurrently": "10.0.3",
     "eslint": "10.6.0",
+    "eslint-plugin-simple-import-sort": "13.0.0",
     "prettier": "3.9.4",
     "tsc-alias": "1.8.17",
     "tsx": "4.22.4",
