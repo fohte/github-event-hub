@@ -182,9 +182,12 @@ describe('createApp', () => {
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
-    const res = await app.request('/unknown', { method: 'POST', body: '{}' })
+    const result = await requestText(app, '/unknown', {
+      method: 'POST',
+      body: '{}',
+    })
 
-    expect(res.status).toBe(404)
+    expect(result).toEqual({ status: 404, body: '404 Not Found' })
   })
 
   it('isolates a failing source from other registered sources', async () => {
@@ -205,7 +208,9 @@ describe('createApp', () => {
       notifier: createNotifier(),
     })
 
-    const failingRes = await app.request('/failing', {
+    // Exercises the failing route so its dispatch rejection is in flight;
+    // its own response is already covered by the "dispatch throws" test above.
+    await app.request('/failing', {
       method: 'POST',
       headers: validHeaders,
       body: '{}',
@@ -216,7 +221,6 @@ describe('createApp', () => {
       body: '{}',
     })
 
-    expect(failingRes.status).toBe(200)
     expect(healthyResult).toEqual({
       status: 200,
       body: { ok: true, outcome: 'notified' },
