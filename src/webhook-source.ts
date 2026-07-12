@@ -39,7 +39,6 @@ export type WebhookSourceRunResult =
   | { status: 'unauthorized' }
   | { status: 'dispatched'; context: SourceContext; outcome: DispatchOutcome }
 
-// Drives a source through extractContext → verify → dispatch, short-circuiting on a null context.
 export const runWebhookSource = async (
   source: WebhookSource,
   rawBody: string,
