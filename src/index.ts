@@ -1,11 +1,35 @@
 import '@/bootstrap'
 
 import { serve } from '@hono/node-server'
+import { Webhooks } from '@octokit/webhooks'
 
 import { loadConfig } from '@/config'
+import { dispatch } from '@/dispatch'
 import { logger } from '@/logger'
 import { createApp } from '@/server'
 import { createSlackNotifier } from '@/slack'
+import type { WebhookSource } from '@/webhook-source'
+
+const createGithubSource = (webhookSecret: string): WebhookSource => {
+  const webhooks = new Webhooks({ secret: webhookSecret })
+  return {
+    name: 'github',
+    path: '/github',
+    extractContext: (headers) => {
+      const deliveryId = headers.get('x-github-delivery')
+      const eventName = headers.get('x-github-event')
+      if (deliveryId === null || eventName === null) return null
+      return { deliveryId, eventName }
+    },
+    verify: (rawBody, headers) =>
+      webhooks.verify(rawBody, headers.get('x-hub-signature-256') ?? ''),
+    dispatch: (context, payload, notifier) =>
+      dispatch(
+        { deliveryId: context.deliveryId, event: context.eventName, notifier },
+        { name: context.eventName, payload },
+      ),
+  }
+}
 
 const main = (): void => {
   const config = loadConfig()
@@ -14,7 +38,7 @@ const main = (): void => {
     config.slackChannel,
   )
   const app = createApp({
-    webhookSecret: config.githubWebhookSecret,
+    sources: [createGithubSource(config.githubWebhookSecret)],
     notifier,
   })
   serve({ fetch: app.fetch, port: config.port }, (info) => {
