@@ -1,9 +1,9 @@
-# github-event-hub
+# webhook-hub
 
 @fohte's personal hub that receives GitHub webhooks and forwards a curated subset to a configurable Slack channel.
 
-[![Test](https://github.com/fohte/github-event-hub/actions/workflows/test.yml/badge.svg)](https://github.com/fohte/github-event-hub/actions/workflows/test.yml)
-[![ghcr.io](https://img.shields.io/badge/ghcr.io-fohte%2Fgithub--event--hub-blue?logo=github)](https://github.com/fohte/github-event-hub/pkgs/container/github-event-hub)
+[![Test](https://github.com/fohte/webhook-hub/actions/workflows/test.yml/badge.svg)](https://github.com/fohte/webhook-hub/actions/workflows/test.yml)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-fohte%2Fwebhook--hub-blue?logo=github)](https://github.com/fohte/webhook-hub/pkgs/container/webhook-hub)
 
 ## Features
 
@@ -39,7 +39,7 @@ To run the service against real GitHub deliveries, three things need to be wired
      -e GITHUB_WEBHOOK_SECRET=... \
      -e SLACK_BOT_TOKEN=xoxb-... \
      -e SLACK_CHANNEL=#your-channel \
-     ghcr.io/fohte/github-event-hub:latest
+     ghcr.io/fohte/webhook-hub:latest
    ```
 
    Expose the container behind HTTPS at a URL GitHub can reach.
