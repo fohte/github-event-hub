@@ -1,5 +1,5 @@
 {
-  "name": "github-event-hub",
+  "name": "webhook-hub",
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "type": "module",

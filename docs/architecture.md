@@ -2,12 +2,12 @@
 
 ## Overview
 
-github-event-hub is a single Hono HTTP service that receives GitHub webhooks, applies a small set of filters, and posts matching events to Slack.
+webhook-hub is a single Hono HTTP service that receives GitHub webhooks, applies a small set of filters, and posts matching events to Slack.
 
 ```mermaid
 sequenceDiagram
   participant GH as GitHub
-  participant POD as github-event-hub
+  participant POD as webhook-hub
   participant SLACK as Slack
 
   GH->>POD: POST /github (webhook payload + x-hub-signature-256)
