@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SlackNotifier } from '@/slack'
 import type {
   DispatchOutcome,
-  SourceContext,
   WebhookHeaders,
   WebhookSource,
 } from '@/webhook-source'
+import { runWebhookSource } from '@/webhook-source'
 
 const headersFrom = (values: Record<string, string>): WebhookHeaders => ({
   get: (name) => values[name] ?? null,
@@ -40,33 +40,22 @@ const createDummySource = () => {
   return { source, verify, dispatch }
 }
 
-// Stand-in for the HTTP shell's future pipeline: exercises the WebhookSource
-// postcondition that a null extractContext short-circuits verify/dispatch.
-const runSource = async (
-  source: WebhookSource,
-  rawBody: string,
-  headers: WebhookHeaders,
-  payload: unknown,
-  notifier: SlackNotifier,
-): Promise<SourceContext | null> => {
-  const context = source.extractContext(headers)
-  if (context === null) return null
-  const verified = await source.verify(rawBody, headers, context)
-  if (!verified) return null
-  await source.dispatch(context, payload, notifier)
-  return context
-}
-
-describe('WebhookSource contract', () => {
+describe('runWebhookSource', () => {
   it('short-circuits verify and dispatch when extractContext returns null', async () => {
     const { source, verify, dispatch } = createDummySource()
     const notifier = createNotifier()
 
-    const result = await runSource(source, '{}', headersFrom({}), {}, notifier)
+    const result = await runWebhookSource(
+      source,
+      '{}',
+      headersFrom({}),
+      {},
+      notifier,
+    )
 
-    expect(result).toBeNull()
-    expect(verify).not.toHaveBeenCalled()
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(result).toEqual({ status: 'unrecognized' })
+    expect(verify.mock.calls).toEqual([])
+    expect(dispatch.mock.calls).toEqual([])
   })
 
   it('calls verify and dispatch when extractContext returns a context', async () => {
@@ -77,13 +66,22 @@ describe('WebhookSource contract', () => {
       'x-dummy-event': 'push',
     })
     const payload = { ok: true }
+    const context = { deliveryId: 'delivery-1', eventName: 'push' }
 
-    const result = await runSource(source, '{}', headers, payload, notifier)
+    const result = await runWebhookSource(
+      source,
+      '{}',
+      headers,
+      payload,
+      notifier,
+    )
 
-    expect(result).toEqual({ deliveryId: 'delivery-1', eventName: 'push' })
-    expect(verify).toHaveBeenCalledTimes(1)
-    expect(verify).toHaveBeenCalledWith('{}', headers, result)
-    expect(dispatch).toHaveBeenCalledTimes(1)
-    expect(dispatch).toHaveBeenCalledWith(result, payload, notifier)
+    expect(result).toEqual({
+      status: 'dispatched',
+      context,
+      outcome: 'notified',
+    })
+    expect(verify.mock.calls).toEqual([['{}', headers, context]])
+    expect(dispatch.mock.calls).toEqual([[context, payload, notifier]])
   })
 })
