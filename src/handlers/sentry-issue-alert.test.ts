@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import type { IssueAlertInput } from '@/handlers/sentry-issue-alert'
-import { buildIssueAlertNotification } from '@/handlers/sentry-issue-alert'
+import type {
+  IssueAlertInput,
+  SentryIssueAlertEvent,
+} from '@/handlers/sentry-issue-alert'
+import {
+  buildIssueAlertNotification,
+  extractIssueAlertInput,
+} from '@/handlers/sentry-issue-alert'
 
 const baseInput = (
   overrides: Partial<IssueAlertInput> = {},
@@ -12,6 +18,30 @@ const baseInput = (
   webUrl: 'https://sentry.io/organizations/fohte/issues/1/',
   triggeredRule: 'Production errors',
   ...overrides,
+})
+
+describe('extractIssueAlertInput', () => {
+  it('maps a Sentry issue alert payload to IssueAlertInput', () => {
+    const payload: SentryIssueAlertEvent = {
+      action: 'triggered',
+      data: {
+        event: {
+          title: 'TypeError: Cannot read properties of undefined',
+          level: 'error',
+          web_url: 'https://sentry.io/organizations/fohte/issues/1/',
+        },
+        triggered_rule: 'Production errors',
+      },
+    }
+
+    expect(extractIssueAlertInput(payload)).toEqual({
+      action: 'triggered',
+      title: 'TypeError: Cannot read properties of undefined',
+      level: 'error',
+      webUrl: 'https://sentry.io/organizations/fohte/issues/1/',
+      triggeredRule: 'Production errors',
+    })
+  })
 })
 
 describe('buildIssueAlertNotification', () => {
