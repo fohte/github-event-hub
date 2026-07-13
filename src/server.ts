@@ -1,83 +1,85 @@
-import { Webhooks } from '@octokit/webhooks'
 import { Hono } from 'hono'
 
-import { dispatch } from '@/dispatch'
 import { logger } from '@/logger'
 import type { SlackNotifier } from '@/slack'
+import type { WebhookHeaders, WebhookSourceRegistry } from '@/webhook-source'
 
-export interface ServerDeps {
-  webhookSecret: string
+export interface CreateAppDeps {
+  sources: WebhookSourceRegistry
   notifier: SlackNotifier
 }
 
-export const createApp = (deps: ServerDeps): Hono => {
-  const webhooks = new Webhooks({ secret: deps.webhookSecret })
+export const createApp = (deps: CreateAppDeps): Hono => {
   const app = new Hono()
 
   app.get('/healthz', (c) => c.text('ok'))
 
-  app.post('/github', async (c) => {
-    const deliveryId = c.req.header('x-github-delivery') ?? ''
-    const event = c.req.header('x-github-event') ?? ''
-    const signature = c.req.header('x-hub-signature-256') ?? ''
-    const body = await c.req.text()
+  for (const source of deps.sources) {
+    app.post(source.path, async (c) => {
+      const headers: WebhookHeaders = {
+        get: (name) => c.req.header(name) ?? null,
+      }
 
-    if (signature === '' || event === '' || deliveryId === '') {
-      logger.warn('webhook_bad_request', {
-        delivery_id: deliveryId,
-        event,
-        reason: 'missing_headers',
-      })
-      return c.json({ error: 'missing required headers' }, 400)
-    }
+      const context = source.extractContext(headers)
+      if (context === null) {
+        logger.warn('webhook_bad_request', {
+          source: source.name,
+          reason: 'missing_headers',
+        })
+        return c.json({ error: 'missing required headers' }, 400)
+      }
 
-    let valid = false
-    try {
-      valid = await webhooks.verify(body, signature)
-    } catch {
-      valid = false
-    }
-    if (!valid) {
-      logger.warn('webhook_invalid_signature', {
-        delivery_id: deliveryId,
-        event,
-      })
-      return c.json({ error: 'invalid signature' }, 401)
-    }
+      const rawBody = await c.req.text()
 
-    let payload: unknown
-    try {
-      payload = JSON.parse(body)
-    } catch (err) {
-      logger.warn('webhook_invalid_json', {
-        delivery_id: deliveryId,
-        event,
-        error: err,
-      })
-      return c.json({ error: 'invalid json' }, 400)
-    }
+      let verified = false
+      try {
+        verified = await source.verify(rawBody, headers, context)
+      } catch {
+        verified = false
+      }
+      if (!verified) {
+        logger.warn('webhook_invalid_signature', {
+          source: source.name,
+          delivery_id: context.deliveryId,
+          event: context.eventName,
+        })
+        return c.json({ error: 'invalid signature' }, 401)
+      }
 
-    try {
-      const outcome = await dispatch(
-        { deliveryId, event, notifier: deps.notifier },
-        { name: event, payload },
-      )
-      logger.info('webhook_processed', {
-        delivery_id: deliveryId,
-        event,
-        outcome,
-      })
-      return c.json({ ok: true, outcome })
-    } catch (err) {
-      logger.error('webhook_handler_error', {
-        delivery_id: deliveryId,
-        event,
-        error: err,
-      })
-      // Return 200 to suppress GitHub's redelivery; handler failures are not retried.
-      return c.json({ ok: false, outcome: 'error' }, 200)
-    }
-  })
+      let payload: unknown
+      try {
+        payload = JSON.parse(rawBody)
+      } catch (err) {
+        logger.warn('webhook_invalid_json', {
+          source: source.name,
+          delivery_id: context.deliveryId,
+          event: context.eventName,
+          error: err,
+        })
+        return c.json({ error: 'invalid json' }, 400)
+      }
+
+      try {
+        const outcome = await source.dispatch(context, payload, deps.notifier)
+        logger.info('webhook_processed', {
+          source: source.name,
+          delivery_id: context.deliveryId,
+          event: context.eventName,
+          outcome,
+        })
+        return c.json({ ok: true, outcome })
+      } catch (err) {
+        logger.error('webhook_handler_error', {
+          source: source.name,
+          delivery_id: context.deliveryId,
+          event: context.eventName,
+          error: err,
+        })
+        // Return 200 to suppress the source's redelivery; handler failures are not retried.
+        return c.json({ ok: false, outcome: 'error' }, 200)
+      }
+    })
+  }
 
   return app
 }
