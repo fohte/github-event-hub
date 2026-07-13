@@ -23,6 +23,10 @@ export const verifySentrySignature = (
     .update(rawBody, 'utf8')
     .digest('hex')
 
+  // Reject an oversized signature before allocating a Buffer for it, so an
+  // attacker can't force large allocations via the signature header alone.
+  if (signature.length !== expected.length) return false
+
   const expectedBuffer = Buffer.from(expected, 'utf8')
   const actualBuffer = Buffer.from(signature, 'utf8')
 
