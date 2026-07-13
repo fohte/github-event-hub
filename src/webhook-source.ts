@@ -1,8 +1,8 @@
 import type { SlackNotifier } from '@/slack'
 
-// Duplicated from dispatch.ts rather than imported: dispatch.ts holds
-// GitHub-specific logic destined for sources/github, while this contract
-// lives in core and must not depend on any specific source.
+// Duplicated from sources/github/dispatch.ts rather than imported: that
+// module holds GitHub-specific logic, while this contract lives in core
+// and must not depend on any specific source.
 export type DispatchOutcome = 'notified' | 'filtered' | 'ignored'
 
 export interface WebhookHeaders {
