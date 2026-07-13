@@ -14,8 +14,7 @@ import {
   buildWorkflowRunNotification,
   extractWorkflowRunInput,
 } from '@/sources/github/handlers/workflow-run'
-
-export type DispatchOutcome = 'notified' | 'filtered' | 'ignored'
+import type { DispatchOutcome } from '@/webhook-source'
 
 export interface DispatchContext {
   deliveryId: string
