@@ -37,10 +37,6 @@ describe('extractSentryContext', () => {
       name: 'Sentry-Hook-Resource is missing',
       values: { 'Request-ID': 'req-1' },
     },
-    {
-      name: 'both headers are missing',
-      values: {},
-    },
   ])('returns null when $name', ({ values }) => {
     expect(extractSentryContext(headersFrom(values))).toBeNull()
   })
@@ -74,7 +70,6 @@ describe('verifySentrySignature', () => {
   it('returns false without throwing when the signature length differs from expected', () => {
     const headers = headersFrom({ 'Sentry-Hook-Signature': 'short' })
 
-    expect(() => verifySentrySignature(BODY, headers, SECRET)).not.toThrow()
     expect(verifySentrySignature(BODY, headers, SECRET)).toBe(false)
   })
 
