@@ -4,18 +4,17 @@ import type {
   WorkflowRunCompletedEvent,
 } from '@octokit/webhooks-types'
 
+import { logger } from '@/logger'
+import type { SlackMessageContent, SlackNotifier } from '@/slack'
 import {
   buildPullRequestNotification,
   extractPullRequestInput,
-} from '@/handlers/pull-request'
+} from '@/sources/github/handlers/pull-request'
 import {
   buildWorkflowRunNotification,
   extractWorkflowRunInput,
-} from '@/handlers/workflow-run'
-import { logger } from '@/logger'
-import type { SlackMessageContent, SlackNotifier } from '@/slack'
-
-export type DispatchOutcome = 'notified' | 'filtered' | 'ignored'
+} from '@/sources/github/handlers/workflow-run'
+import type { DispatchOutcome } from '@/webhook-source'
 
 export interface DispatchContext {
   deliveryId: string

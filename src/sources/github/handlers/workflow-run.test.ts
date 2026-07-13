@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { WorkflowRunInput } from '@/handlers/workflow-run'
-import { buildWorkflowRunNotification } from '@/handlers/workflow-run'
+import type { WorkflowRunInput } from '@/sources/github/handlers/workflow-run'
+import { buildWorkflowRunNotification } from '@/sources/github/handlers/workflow-run'
 
 const baseInput = (
   overrides: Partial<WorkflowRunInput> = {},
@@ -35,15 +35,19 @@ describe('buildWorkflowRunNotification', () => {
 
   it('escapes Slack mrkdwn metacharacters in workflow name', () => {
     expect(
-      buildWorkflowRunNotification(baseInput({ workflow: 'CI <generics>' }))
-        ?.text,
-    ).toBe(
-      [
+      buildWorkflowRunNotification(baseInput({ workflow: 'CI <generics>' })),
+    ).toEqual({
+      text: [
         ':rotating_light: *CI failure on `fohte/example`*',
         'Workflow: *CI &lt;generics&gt;* (branch `main`, commit `abcdef1`)',
         '<https://github.com/fohte/example/actions/runs/1|View run>',
       ].join('\n'),
-    )
+      repo: 'fohte/example',
+      workflow: 'CI <generics>',
+      branch: 'main',
+      sha: 'abcdef1234567890abcdef1234567890abcdef12',
+      url: 'https://github.com/fohte/example/actions/runs/1',
+    })
   })
 
   it.each([

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import type { PullRequestInput } from '@/handlers/pull-request'
+import type { PullRequestInput } from '@/sources/github/handlers/pull-request'
 import {
   buildPullRequestNotification,
   isSecurityPullRequest,
-} from '@/handlers/pull-request'
+} from '@/sources/github/handlers/pull-request'
 
 const baseInput = (
   overrides: Partial<PullRequestInput> = {},
@@ -44,7 +44,7 @@ describe('isSecurityPullRequest', () => {
       input: baseInput({ title: '[security] something else' }),
       expected: false,
     },
-  ])('$name', ({ input, expected }) => {
+  ])('returns $expected when $name', ({ input, expected }) => {
     expect(isSecurityPullRequest(input)).toBe(expected)
   })
 })
@@ -106,13 +106,22 @@ describe('buildPullRequestNotification', () => {
       title: 'fix: support <T> generics [security]',
       branch: 'renovate/foo-vulnerability',
     })
-    expect(buildPullRequestNotification(input)?.text).toBe(
-      [
+    expect(buildPullRequestNotification(input)).toEqual({
+      text: [
         ':lock: *Security PR opened on `fohte/example`*',
         '*fix: support &lt;T&gt; generics [security]*',
         '<https://github.com/fohte/example/pull/1|View pull request>',
       ].join('\n'),
-    )
+      color: '#36a64f',
+      metadata: {
+        event_type: 'security_pr',
+        event_payload: { pr_url: 'https://github.com/fohte/example/pull/1' },
+      },
+      repo: 'fohte/example',
+      title: 'fix: support <T> generics [security]',
+      url: 'https://github.com/fohte/example/pull/1',
+      state: 'opened',
+    })
   })
 
   it('returns null for non-security PRs', () => {

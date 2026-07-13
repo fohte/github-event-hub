@@ -3,7 +3,7 @@ import type {
   PullRequestOpenedEvent,
 } from '@octokit/webhooks-types'
 
-import { escapeSlackMrkdwn } from '@/handlers/slack-mrkdwn'
+import { escapeSlackMrkdwn } from '@/sources/github/handlers/slack-mrkdwn'
 
 export type PullRequestState = 'opened' | 'closed' | 'merged'
 
