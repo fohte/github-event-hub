@@ -1,7 +1,7 @@
-import type { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createApp } from '@/server'
+import { requestJson, requestText } from '@/server-test-support'
 import type { SlackNotifier } from '@/slack'
 import type { DispatchOutcome, WebhookSource } from '@/webhook-source'
 
@@ -30,26 +30,6 @@ const createSource = (overrides: {
 })
 
 const validHeaders = { 'x-delivery': 'delivery-1', 'x-event': 'push' }
-
-// Bundles status and body into one value so each test can assert the whole
-// response with a single equality check.
-const requestJson = async (
-  app: Hono,
-  path: string,
-  init?: RequestInit,
-): Promise<{ status: number; body: unknown }> => {
-  const res = await app.request(path, init)
-  return { status: res.status, body: await res.json() }
-}
-
-const requestText = async (
-  app: Hono,
-  path: string,
-  init?: RequestInit,
-): Promise<{ status: number; body: string }> => {
-  const res = await app.request(path, init)
-  return { status: res.status, body: await res.text() }
-}
 
 describe('createApp', () => {
   it('responds to GET /healthz', async () => {
