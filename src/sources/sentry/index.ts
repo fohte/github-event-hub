@@ -13,7 +13,7 @@ export const createSentrySource = (webhookSecret: string): WebhookSource => ({
     verifySentrySignature(rawBody, headers, webhookSecret),
   dispatch: (context, payload, notifier) =>
     dispatch(
-      { deliveryId: context.deliveryId, resource: context.eventName, notifier },
+      { deliveryId: context.deliveryId, notifier },
       { resource: context.eventName, payload },
     ),
 })

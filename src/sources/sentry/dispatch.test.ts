@@ -25,7 +25,7 @@ describe('dispatch', () => {
     const notifier = createNotifier()
 
     const outcome = await dispatch(
-      { deliveryId: 'req-1', resource: 'event_alert', notifier },
+      { deliveryId: 'req-1', notifier },
       { resource: 'event_alert', payload: issueAlertPayload() },
     )
 
@@ -43,7 +43,7 @@ describe('dispatch', () => {
     const notifier = createNotifier()
 
     const outcome = await dispatch(
-      { deliveryId: 'req-1', resource: 'event_alert', notifier },
+      { deliveryId: 'req-1', notifier },
       {
         resource: 'event_alert',
         payload: issueAlertPayload({ action: 'resolved' }),
@@ -58,8 +58,20 @@ describe('dispatch', () => {
     const notifier = createNotifier()
 
     const outcome = await dispatch(
-      { deliveryId: 'req-1', resource: 'installation', notifier },
+      { deliveryId: 'req-1', notifier },
       { resource: 'installation', payload: {} },
+    )
+
+    expect(outcome).toBe('ignored')
+    expect(notifier.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('returns ignored without posting when action is missing from an unrelated event_alert payload shape', async () => {
+    const notifier = createNotifier()
+
+    const outcome = await dispatch(
+      { deliveryId: 'req-1', notifier },
+      { resource: 'event_alert', payload: { foo: 'bar' } },
     )
 
     expect(outcome).toBe('ignored')

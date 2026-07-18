@@ -9,7 +9,6 @@ import type { DispatchOutcome } from '@/webhook-source'
 
 export interface DispatchContext {
   deliveryId: string
-  resource: string
   notifier: SlackNotifier
 }
 
@@ -18,11 +17,24 @@ interface ParsedEvent {
   payload: unknown
 }
 
+const hasAction = (
+  payload: unknown,
+  action: string,
+): payload is { action: string } =>
+  typeof payload === 'object' &&
+  payload !== null &&
+  'action' in payload &&
+  payload.action === action
+
+// Sentry defines no extra filter stage beyond recognizing a triggered
+// event_alert, so both branches below return "ignored" rather than
+// "filtered" — there is nothing recognized-but-excluded to distinguish.
 export const dispatch = async (
   ctx: DispatchContext,
   parsed: ParsedEvent,
 ): Promise<DispatchOutcome> => {
   if (parsed.resource !== 'event_alert') return 'ignored'
+  if (!hasAction(parsed.payload, 'triggered')) return 'ignored'
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- payload shape refinement
   const typed = parsed.payload as SentryIssueAlertEvent
