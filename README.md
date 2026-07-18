@@ -58,6 +58,8 @@ To run the service against real deliveries, these things need to be wired up.
    - Webhook URL: `https://<your-host>/sentry`
    - Secret: same value as `SENTRY_WEBHOOK_SECRET`
 
+   Creating the integration alone does not send anything — add an action to each project's Alert Rules that notifies this integration.
+
 4. **Create the Slack bot.** Grant the following scopes, install it to the workspace, and invite it into the target channel. Use the bot token (`xoxb-...`) for `SLACK_BOT_TOKEN`.
    - `chat:write` — post and edit messages
    - `channels:history` (public channel) or `groups:history` (private channel) — look up the original PR message to edit on close
