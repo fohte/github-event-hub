@@ -1,5 +1,6 @@
 export interface Config {
   githubWebhookSecret: string
+  sentryWebhookSecret: string
   slackBotToken: string
   slackChannel: string
   port: number
@@ -22,6 +23,7 @@ export const loadConfig = (): Config => {
 
   return {
     githubWebhookSecret: required('GITHUB_WEBHOOK_SECRET'),
+    sentryWebhookSecret: required('SENTRY_WEBHOOK_SECRET'),
     slackBotToken: required('SLACK_BOT_TOKEN'),
     slackChannel: process.env['SLACK_CHANNEL'] ?? '#infra_alert',
     port,

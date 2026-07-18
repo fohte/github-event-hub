@@ -7,6 +7,7 @@ import { logger } from '@/logger'
 import { createApp } from '@/server'
 import { createSlackNotifier } from '@/slack'
 import { createGithubSource } from '@/sources/github'
+import { createSentrySource } from '@/sources/sentry'
 
 const main = (): void => {
   const config = loadConfig()
@@ -15,7 +16,10 @@ const main = (): void => {
     config.slackChannel,
   )
   const app = createApp({
-    sources: [createGithubSource(config.githubWebhookSecret)],
+    sources: [
+      createGithubSource(config.githubWebhookSecret),
+      createSentrySource(config.sentryWebhookSecret),
+    ],
     notifier,
   })
   serve({ fetch: app.fetch, port: config.port }, (info) => {
