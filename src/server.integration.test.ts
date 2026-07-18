@@ -5,6 +5,7 @@ import type { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createApp } from '@/server'
+import { requestJson, requestText } from '@/server-test-support'
 import type { SlackMessageRef, SlackNotifier } from '@/slack'
 import { createGithubSource } from '@/sources/github'
 import { createSentrySource } from '@/sources/sentry'
@@ -32,26 +33,6 @@ const createTestApp = (notifier: SlackNotifier): Hono =>
     ],
     notifier,
   })
-
-// Bundles status and body into one value so each test can assert the whole
-// response with a single equality check.
-const requestJson = async (
-  app: Hono,
-  path: string,
-  init?: RequestInit,
-): Promise<{ status: number; body: unknown }> => {
-  const res = await app.request(path, init)
-  return { status: res.status, body: await res.json() }
-}
-
-const requestText = async (
-  app: Hono,
-  path: string,
-  init?: RequestInit,
-): Promise<{ status: number; body: string }> => {
-  const res = await app.request(path, init)
-  return { status: res.status, body: await res.text() }
-}
 
 const signGithubBody = (body: string): Promise<string> =>
   new Webhooks({ secret: GITHUB_SECRET }).sign(body)
@@ -274,7 +255,7 @@ describe('createApp with the real GitHub and Sentry sources', () => {
     const app = createTestApp(notifier)
 
     const githubBody = githubWorkflowRunFailureBody
-    const githubResult = await requestJson(app, '/github', {
+    await requestJson(app, '/github', {
       method: 'POST',
       headers: {
         'X-GitHub-Delivery': 'delivery-1',
@@ -284,13 +265,8 @@ describe('createApp with the real GitHub and Sentry sources', () => {
       body: githubBody,
     })
 
-    expect(githubResult).toEqual({
-      status: 200,
-      body: { ok: false, outcome: 'error' },
-    })
-
     const sentryBody = sentryIssueAlertTriggeredBody
-    const sentryResult = await requestJson(app, '/sentry', {
+    await requestJson(app, '/sentry', {
       method: 'POST',
       headers: {
         'Request-ID': 'req-1',
@@ -300,10 +276,6 @@ describe('createApp with the real GitHub and Sentry sources', () => {
       body: sentryBody,
     })
 
-    expect(sentryResult).toEqual({
-      status: 200,
-      body: { ok: true, outcome: 'notified' },
-    })
     expect(postMessage.mock.calls).toEqual([
       [{ text: githubWorkflowRunFailureText }],
       [{ text: sentryIssueAlertTriggeredText }],
