@@ -1,4 +1,4 @@
-import { escapeSlackMrkdwn } from '@/handlers/slack-mrkdwn'
+import { escapeSlackMrkdwn } from '@/sources/github/handlers/slack-mrkdwn'
 
 export interface SentryIssueAlertEvent {
   action: string
