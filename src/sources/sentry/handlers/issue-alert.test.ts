@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import type {
   IssueAlertInput,
   SentryIssueAlertEvent,
-} from '@/handlers/sentry-issue-alert'
+} from '@/sources/sentry/handlers/issue-alert'
 import {
   buildIssueAlertNotification,
   extractIssueAlertInput,
-} from '@/handlers/sentry-issue-alert'
+} from '@/sources/sentry/handlers/issue-alert'
 
 const baseInput = (
   overrides: Partial<IssueAlertInput> = {},
@@ -67,14 +67,18 @@ describe('buildIssueAlertNotification', () => {
           level: '<b>error</b>',
           triggeredRule: 'A & B',
         }),
-      )?.text,
-    ).toBe(
-      [
+      ),
+    ).toEqual({
+      text: [
         ':rotating_light: *Sentry alert: Error: &lt;script&gt; &amp; "quotes"*',
         'Level: *&lt;b&gt;error&lt;/b&gt;* / Rule: *A &amp; B*',
         '<https://sentry.io/organizations/fohte/issues/1/|View issue>',
       ].join('\n'),
-    )
+      title: 'Error: <script> & "quotes"',
+      level: '<b>error</b>',
+      webUrl: 'https://sentry.io/organizations/fohte/issues/1/',
+      triggeredRule: 'A & B',
+    })
   })
 
   it('returns null when action is not triggered', () => {

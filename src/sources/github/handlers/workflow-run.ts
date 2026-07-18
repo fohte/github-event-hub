@@ -1,6 +1,6 @@
 import type { WorkflowRunCompletedEvent } from '@octokit/webhooks-types'
 
-import { escapeSlackMrkdwn } from '@/sources/github/handlers/slack-mrkdwn'
+import { escapeSlackMrkdwn } from '@/slack-mrkdwn'
 
 export interface WorkflowRunInput {
   repo: string

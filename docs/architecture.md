@@ -2,31 +2,41 @@
 
 ## Overview
 
-webhook-hub is a single Hono HTTP service that receives GitHub webhooks, applies a small set of filters, and posts matching events to Slack.
+webhook-hub is a single Hono HTTP service that receives webhooks from multiple sources (GitHub, Sentry), applies a small set of filters, and posts matching events to Slack.
 
 ```mermaid
 sequenceDiagram
-  participant GH as GitHub
+  participant SRC as Webhook source (GitHub / Sentry)
   participant POD as webhook-hub
   participant SLACK as Slack
 
-  GH->>POD: POST /github (webhook payload + x-hub-signature-256)
+  SRC->>POD: POST /<source> (webhook payload + signature header)
   POD->>POD: verify signature, dispatch, filter
   alt event matches a notification rule
     POD->>SLACK: chat.postMessage
     SLACK-->>POD: ok
   end
-  POD-->>GH: 200
+  POD-->>SRC: 200
 ```
 
 ## Request flow
 
-1. GitHub delivers a webhook to `POST /github` with the headers `x-github-delivery`, `x-github-event`, and `x-hub-signature-256`. Missing any of these returns `400`.
-2. `@octokit/webhooks` verifies the HMAC-SHA256 signature against `GITHUB_WEBHOOK_SECRET`. Failure returns `401`.
+Each registered `WebhookSource` (`src/webhook-source.ts`) is mounted at its own path and runs the same pipeline (`src/server.ts`):
+
+1. `extractContext()` pulls the delivery ID and event/resource name from the request headers. Missing headers return `400`.
+2. `verify()` checks the request's signature against the source's shared secret. Failure returns `401`.
 3. The raw body is parsed as JSON. Parse failure returns `400`.
-4. `dispatch()` switches on the event name and runs the matching handler.
+4. `dispatch()` runs the source-specific handler for the event.
 5. If the handler returns a notification, the Slack client posts it; otherwise the request is recorded as `filtered` or `ignored`.
-6. Successful processing returns `200` with `{ ok: true, outcome }`. Any thrown error inside dispatch/handler is logged and also returned as `200` with `{ ok: false, outcome: "error" }` — this is intentional, because GitHub will redeliver any non-2xx response and the failures here are not transient.
+6. Successful processing returns `200` with `{ ok: true, outcome }`. Any thrown error inside dispatch/handler is logged and also returned as `200` with `{ ok: false, outcome: "error" }` — this is intentional, because the source will redeliver any non-2xx response and the failures here are not transient.
+
+### GitHub (`POST /github`)
+
+Headers: `x-github-delivery`, `x-github-event`, `x-hub-signature-256`. `@octokit/webhooks` verifies the HMAC-SHA256 signature against `GITHUB_WEBHOOK_SECRET`.
+
+### Sentry (`POST /sentry`)
+
+Headers: `Request-ID`, `Sentry-Hook-Resource`, `Sentry-Hook-Signature`. The signature is an HMAC-SHA256 of the raw body against `SENTRY_WEBHOOK_SECRET`, compared with `timingSafeEqual` (`src/sources/sentry/verify.ts`).
 
 ## Notification rules
 
@@ -59,3 +69,14 @@ The message tags the PR as a security PR, includes the title, and links to the P
 The link back to the original message uses Slack message metadata (`event_type: "security_pr"`, `event_payload: { pr_url }`). On a `closed` event the handler scans recent `conversations.history` of `SLACK_CHANNEL` for a matching metadata payload and edits that message in place. If no matching message is found (e.g. the original is past the history window, or the bot was offline when the PR was opened), the close notification is posted as a new message instead.
 
 All other events and actions short-circuit to `ignored`.
+
+### Sentry issue alerts
+
+A Slack message is posted only when **both** of the following are true:
+
+- `Sentry-Hook-Resource === "event_alert"`
+- `payload.action === "triggered"`
+
+The message includes the issue title, level, triggered rule, and a link to the issue page.
+
+All other resources and actions short-circuit to `ignored`. No further filtering is applied on top of this — every verified, triggered issue alert is forwarded.
