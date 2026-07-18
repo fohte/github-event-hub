@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import type {
   IssueAlertInput,
   SentryIssueAlertEvent,
-} from '@/handlers/sentry-issue-alert'
+} from '@/sources/sentry/handlers/issue-alert'
 import {
   buildIssueAlertNotification,
   extractIssueAlertInput,
-} from '@/handlers/sentry-issue-alert'
+} from '@/sources/sentry/handlers/issue-alert'
 
 const baseInput = (
   overrides: Partial<IssueAlertInput> = {},

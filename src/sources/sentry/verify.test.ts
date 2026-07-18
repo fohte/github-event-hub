@@ -2,7 +2,10 @@ import { createHmac } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { extractSentryContext, verifySentrySignature } from '@/sources/sentry'
+import {
+  extractSentryContext,
+  verifySentrySignature,
+} from '@/sources/sentry/verify'
 import type { WebhookHeaders } from '@/webhook-source'
 
 const SECRET = 'test-secret'
