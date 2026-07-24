@@ -1,6 +1,8 @@
+import { errAsync, okAsync, type ResultAsync } from 'neverthrow'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { SlackNotifier } from '@/slack'
+import { SlackApiError } from '@/slack'
 import type {
   DispatchOutcome,
   WebhookHeaders,
@@ -22,8 +24,8 @@ const createNotifier = (): SlackNotifier => ({
 // on them directly, without extracting bound methods off `source`.
 const createDummySource = () => {
   const verify = vi.fn((): boolean => true)
-  const dispatch = vi.fn((): Promise<DispatchOutcome> =>
-    Promise.resolve('notified'),
+  const dispatch = vi.fn((): ResultAsync<DispatchOutcome, SlackApiError> =>
+    okAsync('notified'),
   )
   const source: WebhookSource = {
     name: 'dummy',
@@ -83,5 +85,30 @@ describe('runWebhookSource', () => {
     })
     expect(verify.mock.calls).toEqual([['{}', headers, context]])
     expect(dispatch.mock.calls).toEqual([[context, payload, notifier]])
+  })
+
+  it('returns status error with the failure when dispatch fails', async () => {
+    const { source, dispatch } = createDummySource()
+    const dispatchErr = new SlackApiError('boom')
+    dispatch.mockReturnValue(errAsync(dispatchErr))
+    const notifier = createNotifier()
+    const headers = headersFrom({
+      'x-dummy-delivery': 'delivery-1',
+      'x-dummy-event': 'push',
+    })
+
+    const result = await runWebhookSource(
+      source,
+      '{}',
+      headers,
+      { ok: true },
+      notifier,
+    )
+
+    expect(result).toEqual({
+      status: 'error',
+      context: { deliveryId: 'delivery-1', eventName: 'push' },
+      error: dispatchErr,
+    })
   })
 })

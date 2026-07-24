@@ -1,9 +1,16 @@
+import { captureWithFingerprint } from '@fohte/service-kit/observability'
+import { errAsync, okAsync, type ResultAsync } from 'neverthrow'
 import { describe, expect, it, vi } from 'vitest'
 
-import { createApp } from '@/server'
+import { createApp, WebhookDispatchError } from '@/server'
 import { requestJson, requestText } from '@/server-test-support'
 import type { SlackNotifier } from '@/slack'
+import { SlackApiError } from '@/slack'
 import type { DispatchOutcome, WebhookSource } from '@/webhook-source'
+
+vi.mock('@fohte/service-kit/observability', () => ({
+  captureWithFingerprint: vi.fn(),
+}))
 
 const createNotifier = (): SlackNotifier => ({
   postMessage: vi.fn(),
@@ -15,7 +22,7 @@ const createSource = (overrides: {
   name?: string
   path?: string
   verify: () => boolean
-  dispatch: () => Promise<DispatchOutcome>
+  dispatch: () => ResultAsync<DispatchOutcome, SlackApiError>
 }): WebhookSource => ({
   name: overrides.name ?? 'dummy',
   path: overrides.path ?? '/dummy',
@@ -43,7 +50,7 @@ describe('createApp', () => {
   it('returns 200 with the outcome when dispatch succeeds', async () => {
     const source = createSource({
       verify: () => true,
-      dispatch: () => Promise.resolve('notified'),
+      dispatch: () => okAsync('notified'),
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
@@ -62,7 +69,7 @@ describe('createApp', () => {
   it('returns 400 when required headers are missing', async () => {
     const source = createSource({
       verify: () => true,
-      dispatch: () => Promise.resolve('notified'),
+      dispatch: () => okAsync('notified'),
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
@@ -80,7 +87,7 @@ describe('createApp', () => {
   it('returns 401 when signature verification fails', async () => {
     const source = createSource({
       verify: () => false,
-      dispatch: () => Promise.resolve('notified'),
+      dispatch: () => okAsync('notified'),
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
@@ -101,7 +108,7 @@ describe('createApp', () => {
       verify: () => {
         throw new Error('boom')
       },
-      dispatch: () => Promise.resolve('notified'),
+      dispatch: () => okAsync('notified'),
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
@@ -120,7 +127,7 @@ describe('createApp', () => {
   it('returns 400 when the body is not valid JSON', async () => {
     const source = createSource({
       verify: () => true,
-      dispatch: () => Promise.resolve('notified'),
+      dispatch: () => okAsync('notified'),
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
@@ -136,10 +143,11 @@ describe('createApp', () => {
     })
   })
 
-  it('returns 200 with outcome error when dispatch throws', async () => {
+  it('returns 200 with outcome error and reports to Sentry when dispatch fails', async () => {
+    const dispatchErr = new SlackApiError('boom')
     const source = createSource({
       verify: () => true,
-      dispatch: () => Promise.reject(new Error('boom')),
+      dispatch: () => errAsync(dispatchErr),
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
@@ -153,12 +161,28 @@ describe('createApp', () => {
       status: 200,
       body: { ok: false, outcome: 'error' },
     })
+    expect(vi.mocked(captureWithFingerprint).mock.calls).toEqual([
+      [
+        new WebhookDispatchError(
+          'failed to dispatch dummy webhook',
+          dispatchErr,
+        ),
+        'webhook-hub.webhook-dispatch-failed',
+        {
+          extras: {
+            source: 'dummy',
+            deliveryId: 'delivery-1',
+            event: 'push',
+          },
+        },
+      ],
+    ])
   })
 
   it('returns 404 for an unregistered path', async () => {
     const source = createSource({
       verify: () => true,
-      dispatch: () => Promise.resolve('notified'),
+      dispatch: () => okAsync('notified'),
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
@@ -175,21 +199,21 @@ describe('createApp', () => {
       name: 'failing',
       path: '/failing',
       verify: () => true,
-      dispatch: () => Promise.reject(new Error('boom')),
+      dispatch: () => errAsync(new SlackApiError('boom')),
     })
     const healthy = createSource({
       name: 'healthy',
       path: '/healthy',
       verify: () => true,
-      dispatch: () => Promise.resolve('notified'),
+      dispatch: () => okAsync('notified'),
     })
     const app = createApp({
       sources: [failing, healthy],
       notifier: createNotifier(),
     })
 
-    // Exercises the failing route so its dispatch rejection is in flight;
-    // its own response is already covered by the "dispatch throws" test above.
+    // Exercises the failing route so its dispatch failure is in flight;
+    // its own response is already covered by the "dispatch fails" test above.
     await app.request('/failing', {
       method: 'POST',
       headers: validHeaders,
@@ -205,5 +229,33 @@ describe('createApp', () => {
       status: 200,
       body: { ok: true, outcome: 'notified' },
     })
+  })
+
+  it('reports to Sentry and returns 500 when a source handler throws unexpectedly', async () => {
+    const thrown = new Error('boom')
+    const source: WebhookSource = {
+      name: 'dummy',
+      path: '/dummy',
+      extractContext: () => {
+        throw thrown
+      },
+      verify: () => true,
+      dispatch: () => okAsync('notified'),
+    }
+    const app = createApp({ sources: [source], notifier: createNotifier() })
+
+    const result = await requestJson(app, '/dummy', {
+      method: 'POST',
+      headers: validHeaders,
+      body: '{}',
+    })
+
+    expect(result).toEqual({
+      status: 500,
+      body: { error: 'internal error' },
+    })
+    expect(vi.mocked(captureWithFingerprint).mock.calls).toEqual([
+      [thrown, 'webhook-hub.unexpected-error'],
+    ])
   })
 })

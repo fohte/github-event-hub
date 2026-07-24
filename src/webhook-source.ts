@@ -1,4 +1,6 @@
-import type { SlackNotifier } from '@/slack'
+import type { ResultAsync } from 'neverthrow'
+
+import type { SlackApiError, SlackNotifier } from '@/slack'
 
 export type DispatchOutcome = 'notified' | 'filtered' | 'ignored'
 
@@ -25,7 +27,7 @@ export interface WebhookSource {
     context: SourceContext,
     payload: unknown,
     notifier: SlackNotifier,
-  ): Promise<DispatchOutcome>
+  ): ResultAsync<DispatchOutcome, SlackApiError>
 }
 
 /** Paths across sources must be unique; this is a precondition, not validated here. */
@@ -35,6 +37,7 @@ export type WebhookSourceRunResult =
   | { status: 'unrecognized' }
   | { status: 'unauthorized' }
   | { status: 'dispatched'; context: SourceContext; outcome: DispatchOutcome }
+  | { status: 'error'; context: SourceContext; error: SlackApiError }
 
 export const runWebhookSource = async (
   source: WebhookSource,
@@ -49,6 +52,8 @@ export const runWebhookSource = async (
   const verified = await source.verify(rawBody, headers, context)
   if (!verified) return { status: 'unauthorized' }
 
-  const outcome = await source.dispatch(context, payload, notifier)
-  return { status: 'dispatched', context, outcome }
+  return source.dispatch(context, payload, notifier).match(
+    (outcome) => ({ status: 'dispatched', context, outcome }),
+    (error) => ({ status: 'error', context, error }),
+  )
 }

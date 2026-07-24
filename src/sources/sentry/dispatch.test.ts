@@ -1,9 +1,10 @@
+import { okAsync } from 'neverthrow'
 import { describe, expect, it, vi } from 'vitest'
 
 import { dispatch } from '@/sources/sentry/dispatch'
 
 const createNotifier = () => ({
-  postMessage: vi.fn().mockResolvedValue({ channel: 'C1', ts: '1' }),
+  postMessage: vi.fn().mockReturnValue(okAsync({ channel: 'C1', ts: '1' })),
   updateMessage: vi.fn(),
   findMessageByMetadata: vi.fn(),
 })
@@ -24,10 +25,12 @@ describe('dispatch', () => {
   it('posts to Slack and returns notified for a triggered event_alert', async () => {
     const notifier = createNotifier()
 
-    const outcome = await dispatch(
-      { deliveryId: 'req-1', notifier },
-      { resource: 'event_alert', payload: issueAlertPayload() },
-    )
+    const outcome = (
+      await dispatch(
+        { deliveryId: 'req-1', notifier },
+        { resource: 'event_alert', payload: issueAlertPayload() },
+      )
+    )._unsafeUnwrap()
 
     expect(outcome).toBe('notified')
     expect(notifier.postMessage).toHaveBeenCalledExactlyOnceWith({
@@ -42,13 +45,15 @@ describe('dispatch', () => {
   it('returns ignored without posting when the action is not triggered', async () => {
     const notifier = createNotifier()
 
-    const outcome = await dispatch(
-      { deliveryId: 'req-1', notifier },
-      {
-        resource: 'event_alert',
-        payload: issueAlertPayload({ action: 'resolved' }),
-      },
-    )
+    const outcome = (
+      await dispatch(
+        { deliveryId: 'req-1', notifier },
+        {
+          resource: 'event_alert',
+          payload: issueAlertPayload({ action: 'resolved' }),
+        },
+      )
+    )._unsafeUnwrap()
 
     expect(outcome).toBe('ignored')
     expect(notifier.postMessage).not.toHaveBeenCalled()
@@ -57,10 +62,12 @@ describe('dispatch', () => {
   it('returns ignored without posting when the resource is not event_alert', async () => {
     const notifier = createNotifier()
 
-    const outcome = await dispatch(
-      { deliveryId: 'req-1', notifier },
-      { resource: 'installation', payload: {} },
-    )
+    const outcome = (
+      await dispatch(
+        { deliveryId: 'req-1', notifier },
+        { resource: 'installation', payload: {} },
+      )
+    )._unsafeUnwrap()
 
     expect(outcome).toBe('ignored')
     expect(notifier.postMessage).not.toHaveBeenCalled()
@@ -69,10 +76,12 @@ describe('dispatch', () => {
   it('returns ignored without posting when action is missing from an unrelated event_alert payload shape', async () => {
     const notifier = createNotifier()
 
-    const outcome = await dispatch(
-      { deliveryId: 'req-1', notifier },
-      { resource: 'event_alert', payload: { foo: 'bar' } },
-    )
+    const outcome = (
+      await dispatch(
+        { deliveryId: 'req-1', notifier },
+        { resource: 'event_alert', payload: { foo: 'bar' } },
+      )
+    )._unsafeUnwrap()
 
     expect(outcome).toBe('ignored')
     expect(notifier.postMessage).not.toHaveBeenCalled()
