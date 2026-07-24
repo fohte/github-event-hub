@@ -46,6 +46,15 @@ type MessagePayload = { metadata?: SlackMessageMetadata } & (
     }
 )
 
+const wrapSlackApi = <T>(
+  promise: Promise<T>,
+  message: string,
+): ResultAsync<T, SlackApiError> =>
+  ResultAsync.fromPromise(
+    promise,
+    (caughtErr) => new SlackApiError(message, caughtErr),
+  )
+
 const buildPayload = (content: SlackMessageContent): MessagePayload => {
   // Slack renders the coloured border only when the body lives inside the attachment.
   const base: MessagePayload =
@@ -69,7 +78,7 @@ export const createSlackNotifier = (
   let cachedChannelId: ResultAsync<string, SlackApiError> | null = null
 
   const resolveChannelIdUncached = (): ResultAsync<string, SlackApiError> =>
-    ResultAsync.fromPromise(
+    wrapSlackApi(
       (async (): Promise<Result<string, SlackApiError>> => {
         if (!channel.startsWith('#')) return ok(channel)
         const name = channel.slice(1)
@@ -89,8 +98,7 @@ export const createSlackNotifier = (
         }
         return err(new SlackApiError(`Slack channel not found: ${channel}`))
       })(),
-      (caughtErr) =>
-        new SlackApiError('failed to resolve Slack channel id', caughtErr),
+      'failed to resolve Slack channel id',
     ).andThen((result) => result)
 
   const resolveChannelId = (): ResultAsync<string, SlackApiError> => {
@@ -106,13 +114,12 @@ export const createSlackNotifier = (
   return {
     postMessage(content) {
       return resolveChannelId().andThen((channelId) =>
-        ResultAsync.fromPromise(
+        wrapSlackApi(
           client.chat.postMessage({
             channel: channelId,
             ...buildPayload(content),
           }),
-          (caughtErr) =>
-            new SlackApiError('failed to post Slack message', caughtErr),
+          'failed to post Slack message',
         ).andThen((res) =>
           res.ts === undefined || res.channel === undefined
             ? err(
@@ -125,29 +132,24 @@ export const createSlackNotifier = (
       )
     },
     updateMessage(ref, content) {
-      return ResultAsync.fromPromise(
+      return wrapSlackApi(
         client.chat.update({
           channel: ref.channel,
           ts: ref.ts,
           ...buildPayload(content),
         }),
-        (caughtErr) =>
-          new SlackApiError('failed to update Slack message', caughtErr),
+        'failed to update Slack message',
       ).map(() => undefined)
     },
     findMessageByMetadata(eventType, payloadMatcher) {
       return resolveChannelId().andThen((channelId) =>
-        ResultAsync.fromPromise(
+        wrapSlackApi(
           client.conversations.history({
             channel: channelId,
             limit: 200,
             include_all_metadata: true,
           }),
-          (caughtErr) =>
-            new SlackApiError(
-              'failed to fetch Slack conversation history',
-              caughtErr,
-            ),
+          'failed to fetch Slack conversation history',
         ).map((res) => {
           const match = res.messages?.find((m) => {
             const md = (m as { metadata?: Partial<SlackMessageMetadata> })

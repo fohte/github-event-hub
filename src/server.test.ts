@@ -18,20 +18,23 @@ const createNotifier = (): SlackNotifier => ({
   findMessageByMetadata: vi.fn(),
 })
 
+const defaultExtractContext: WebhookSource['extractContext'] = (headers) => {
+  const deliveryId = headers.get('x-delivery')
+  const eventName = headers.get('x-event')
+  if (deliveryId === null || eventName === null) return null
+  return { deliveryId, eventName }
+}
+
 const createSource = (overrides: {
   name?: string
   path?: string
+  extractContext?: WebhookSource['extractContext']
   verify: () => boolean
   dispatch: () => ResultAsync<DispatchOutcome, SlackApiError>
 }): WebhookSource => ({
   name: overrides.name ?? 'dummy',
   path: overrides.path ?? '/dummy',
-  extractContext: (headers) => {
-    const deliveryId = headers.get('x-delivery')
-    const eventName = headers.get('x-event')
-    if (deliveryId === null || eventName === null) return null
-    return { deliveryId, eventName }
-  },
+  extractContext: overrides.extractContext ?? defaultExtractContext,
   verify: overrides.verify,
   dispatch: overrides.dispatch,
 })
@@ -143,11 +146,10 @@ describe('createApp', () => {
     })
   })
 
-  it('returns 200 with outcome error and reports to Sentry when dispatch fails', async () => {
-    const dispatchErr = new SlackApiError('boom')
+  it('returns 200 with outcome error when dispatch fails', async () => {
     const source = createSource({
       verify: () => true,
-      dispatch: () => errAsync(dispatchErr),
+      dispatch: () => errAsync(new SlackApiError('boom')),
     })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
@@ -161,6 +163,22 @@ describe('createApp', () => {
       status: 200,
       body: { ok: false, outcome: 'error' },
     })
+  })
+
+  it('reports a dispatch failure to Sentry', async () => {
+    const dispatchErr = new SlackApiError('boom')
+    const source = createSource({
+      verify: () => true,
+      dispatch: () => errAsync(dispatchErr),
+    })
+    const app = createApp({ sources: [source], notifier: createNotifier() })
+
+    await requestJson(app, '/dummy', {
+      method: 'POST',
+      headers: validHeaders,
+      body: '{}',
+    })
+
     expect(vi.mocked(captureWithFingerprint).mock.calls).toEqual([
       [
         new WebhookDispatchError(
@@ -231,17 +249,14 @@ describe('createApp', () => {
     })
   })
 
-  it('reports to Sentry and returns 500 when a source handler throws unexpectedly', async () => {
-    const thrown = new Error('boom')
-    const source: WebhookSource = {
-      name: 'dummy',
-      path: '/dummy',
+  it('returns 500 when a source handler throws unexpectedly', async () => {
+    const source = createSource({
       extractContext: () => {
-        throw thrown
+        throw new Error('boom')
       },
       verify: () => true,
       dispatch: () => okAsync('notified'),
-    }
+    })
     const app = createApp({ sources: [source], notifier: createNotifier() })
 
     const result = await requestJson(app, '/dummy', {
@@ -254,6 +269,25 @@ describe('createApp', () => {
       status: 500,
       body: { error: 'internal error' },
     })
+  })
+
+  it('reports an unexpected source handler failure to Sentry', async () => {
+    const thrown = new Error('boom')
+    const source = createSource({
+      extractContext: () => {
+        throw thrown
+      },
+      verify: () => true,
+      dispatch: () => okAsync('notified'),
+    })
+    const app = createApp({ sources: [source], notifier: createNotifier() })
+
+    await requestJson(app, '/dummy', {
+      method: 'POST',
+      headers: validHeaders,
+      body: '{}',
+    })
+
     expect(vi.mocked(captureWithFingerprint).mock.calls).toEqual([
       [thrown, 'webhook-hub.unexpected-error'],
     ])

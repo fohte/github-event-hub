@@ -54,10 +54,11 @@ export const createApp = (deps: CreateAppDeps): Hono => {
 
       const rawBody = await c.req.text()
 
-      // extractContext/verify are the source's own contract, which allows
-      // synchronous throws (@octokit/webhooks-methods throws TypeError on a
-      // falsy signature) alongside a rejecting promise — the async wrapper
-      // normalizes both into a single promise `.catch` can collapse to false.
+      // verify's contract allows a synchronous throw (@octokit/webhooks-methods
+      // throws TypeError on a falsy signature) alongside a rejecting promise —
+      // the async wrapper normalizes both into a single promise `.catch` can
+      // collapse to false. extractContext is synchronous only; a throw there
+      // propagates to the onError handler above instead.
       const verified = await (async () =>
         source.verify(rawBody, headers, context))().catch(() => false)
       if (!verified) {
