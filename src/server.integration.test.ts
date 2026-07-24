@@ -2,20 +2,26 @@ import { createHmac } from 'node:crypto'
 
 import { Webhooks } from '@octokit/webhooks'
 import type { Hono } from 'hono'
+import { errAsync, okAsync, type ResultAsync } from 'neverthrow'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createApp } from '@/server'
 import { requestJson, requestText } from '@/server-test-support'
 import type { SlackMessageRef, SlackNotifier } from '@/slack'
+import { SlackApiError } from '@/slack'
 import { createGithubSource } from '@/sources/github'
 import { createSentrySource } from '@/sources/sentry'
+
+vi.mock('@fohte/service-kit/observability', () => ({
+  captureWithFingerprint: vi.fn(),
+}))
 
 const GITHUB_SECRET = 'github-test-secret'
 const SENTRY_SECRET = 'sentry-test-secret'
 
 const createNotifier = () => {
-  const postMessage = vi.fn((): Promise<SlackMessageRef> =>
-    Promise.resolve({ channel: 'C1', ts: '1' }),
+  const postMessage = vi.fn((): ResultAsync<SlackMessageRef, SlackApiError> =>
+    okAsync({ channel: 'C1', ts: '1' }),
   )
   const notifier: SlackNotifier = {
     postMessage,
@@ -249,9 +255,9 @@ describe('createApp with the real GitHub and Sentry sources', () => {
     expect(result).toEqual({ status: 400, body: { error: 'invalid json' } })
   })
 
-  it('isolates a dispatch exception in the GitHub source from the Sentry source', async () => {
+  it('isolates a dispatch failure in the GitHub source from the Sentry source', async () => {
     const { notifier, postMessage } = createNotifier()
-    postMessage.mockRejectedValueOnce(new Error('boom'))
+    postMessage.mockReturnValueOnce(errAsync(new SlackApiError('boom')))
     const app = createTestApp(notifier)
 
     const githubBody = githubWorkflowRunFailureBody

@@ -1,7 +1,10 @@
 import { config } from '@fohte/eslint-config'
 
 export default config(
-  { typescript: { typeChecked: true } },
+  {
+    typescript: { typeChecked: true },
+    errorHandling: { interopBoundaryFiles: ['src/config.ts'] },
+  },
   { ignores: ['dist/**'] },
   {
     rules: {
